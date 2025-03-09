@@ -216,8 +216,8 @@ function rotationDurationMeasurement() {
             send('break')
             break 
         }
-        send('current_mode : ' + mode)
-        basic.pause(200)
+        // send('current_mode : ' + mode)
+        basic.pause(20)
     }
 
     wuKong.setMotorSpeed(wuKong.MotorList.M1, 0)
