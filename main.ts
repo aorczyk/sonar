@@ -15,6 +15,7 @@ let rotationSpeed = -10;
 let rotationDuration = 0;
 let signalFrequency = 0;
 let sonarStartTime = 0;
+let distanceSemplingTime = 100;
 
 music.setVolume(50)
 
@@ -56,6 +57,7 @@ basic.forever(function () {
 
         if (commandName == "-v") {
             wuKong.setMotorSpeed(wuKong.MotorList.M1, 0)
+            wuKong.setServoSpeed(wuKong.ServoList.S0, 0)
 
             bluetooth.uartWriteLine('vc;import_start;')
             bluetooth.uartWriteLine('vc;init;')
@@ -71,8 +73,10 @@ basic.forever(function () {
             bluetooth.uartWriteLine('vc;import_end;')
         } else if (commandName == "oy" || commandName == "sl" || commandName == "jry") {
             wuKong.setMotorSpeed(wuKong.MotorList.M1, commandValue)
+            wuKong.setServoSpeed(wuKong.ServoList.S0, commandValue)
         } else if (commandName == "ox" || commandName == "sr" || commandName == "jrx") {
             wuKong.setMotorSpeed(wuKong.MotorList.M1, commandValue)
+            wuKong.setServoSpeed(wuKong.ServoList.S0, commandValue)
         } else if (commandName == "1" || commandName == "2" || commandName == "3") {
             if (commandName == "1") {
                 switchMode(0)
@@ -81,9 +85,11 @@ basic.forever(function () {
                     if (rotationDuration) {
                         sonarStartTime = input.runningTime()
                         wuKong.setMotorSpeed(wuKong.MotorList.M1, rotationSpeed)
+                        wuKong.setServoSpeed(wuKong.ServoList.S0, rotationSpeed)
                     }
                 } else {
                     wuKong.setMotorSpeed(wuKong.MotorList.M1, 0)
+                    wuKong.setServoSpeed(wuKong.ServoList.S0, 0)
                 }
                 switchMode(1)
             } else if (commandName == "3") {
@@ -92,6 +98,20 @@ basic.forever(function () {
                 if (mode == 2) {
                     rotationDurationMeasurement()
                 }
+            }
+        } else if (commandName == "rotationSpeed") {
+            rotationSpeed = commandValue
+        } else if (commandName == "distanceSemplingTime") {
+            distanceSemplingTime = commandValue
+        } else if (commandName == "maxDistance") {
+            maxDistance = commandValue
+        } else if (commandName == "sendMode") {
+            sendMode = commandValue
+        } else if (commandName == "setMode") {
+            mode = commandValue
+
+            if (mode == 2) {
+                rotationDurationMeasurement()
             }
         }
     }
@@ -105,6 +125,17 @@ basic.forever(function () {
         basic.pause(20)
     }
 })
+
+let sendMode = 0;
+
+function send(message: string) {
+    if (sendMode == 0) {
+        bluetooth.uartWriteLine(message)
+    } else {
+        sendQueue.push(message)
+    }
+}
+
 
 let lastSignalTime = 0;
 
@@ -126,12 +157,12 @@ basic.forever(function () {
         
         if (distance > 0 && distance < maxDistance) {
             signalFrequency = 25 * distance - 300
-            sendQueue.push([input.runningTime(), distance].join(','))
+            send([input.runningTime(), distance].join(','))
         } else {
             signalFrequency = 0
         }
 
-        basic.pause(200)
+        basic.pause(distanceSemplingTime)
     } else if (mode == 1) {
         let distance = sonar.ping(DigitalPin.P0, DigitalPin.P1, PingUnit.Centimeters)
         let angle = ((input.runningTime() - sonarStartTime) % rotationDuration) * 360 / rotationDuration
@@ -143,15 +174,15 @@ basic.forever(function () {
         }
 
         if (distance > 0 && distance < maxDistance || angleCounter >= triggerAngle) {
-            sendQueue.push([input.runningTime(), distance, angle].join(','))
+            send([input.runningTime(), distance, angle].join(','))
 
             lastAngle = angle;
         } else if (angleCounter >= triggerAngle) {
-            sendQueue.push([input.runningTime(), 0, angle].join(','))
+            send([input.runningTime(), 0, angle].join(','))
             lastAngle = angle;
         }
 
-        basic.pause(20)
+        basic.pause(distanceSemplingTime)
     }
 })
 
@@ -161,10 +192,10 @@ function rotationDurationMeasurement() {
     let endTime: number = 0;
 
     wuKong.setMotorSpeed(wuKong.MotorList.M1, rotationSpeed)
-    let nr = 0;
+    wuKong.setServoSpeed(wuKong.ServoList.S0, rotationSpeed)
     let trigger = false;
 
-    while ((!startTime || !endTime) && mode == 2) {
+    while (!startTime || !endTime) {
         let distance = sonar.ping(DigitalPin.P0, DigitalPin.P1, PingUnit.Centimeters)
 
         if (distance > 0 && distance < 10) {
@@ -181,13 +212,18 @@ function rotationDurationMeasurement() {
             trigger = false
         }
 
-        basic.pause(50)
+        if (mode != 2) {
+            send('break')
+            break 
+        }
+        send('current_mode : ' + mode)
+        basic.pause(200)
     }
 
     wuKong.setMotorSpeed(wuKong.MotorList.M1, 0)
+    wuKong.setServoSpeed(wuKong.ServoList.S0, 0)
 
     rotationDuration = endTime - startTime
 
-    sendQueue.push('rotation;' + rotationDuration)
-    switchMode(2)
+    send('rotation;' + rotationDuration)
 }
