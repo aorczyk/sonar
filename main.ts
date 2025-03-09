@@ -52,7 +52,7 @@ function send(message: string) {
     }
 }
 
-function switchMode(newMode: number) {
+function switchMode(newMode: number = null) {
     if (modeToButton[mode]) {
         bluetooth.uartWriteLine('vc;b;' + modeToButton[mode] + ';1;0;')
     }
@@ -117,7 +117,11 @@ basic.forever(function () {
                 switchMode(0)
         } else if (commandName == "2") {
                 if (mode != 1) {
-                    startSonar()
+                    if (rotationDuration) {
+                        startSonar()
+                    } else {
+                        send('alert;Rotation time is not set!')
+                    }
                 } else {
                     stop()
                 }
@@ -130,16 +134,6 @@ basic.forever(function () {
             maxDistance = commandValue
         } else if (commandName == "sendMode") {
             sendMode = commandValue
-        } else if (commandName == "setSonar") {
-            mode = 2
-        } else if (commandName == "runSonar") {
-            mode = 1
-
-            if (rotationDuration) {
-                startSonar()
-            } else {
-                send('alert;Rotation time is not set!')
-            }
         } else if (commandName == "dataAngle") {
             dataAngle = commandValue
         } else if (commandName == "sweepAngle") {
@@ -147,7 +141,7 @@ basic.forever(function () {
         } else if (commandName == "musicVolume") {
             music.setVolume(commandValue)
         } else if (commandName == "stop") {
-            mode = null
+            switchMode()
             stop()
         }
     }
