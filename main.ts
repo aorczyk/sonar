@@ -94,10 +94,6 @@ basic.forever(function () {
                 switchMode(1)
             } else if (commandName == "3") {
                 switchMode(2)
-
-                if (mode == 2) {
-                    rotationDurationMeasurement()
-                }
             }
         } else if (commandName == "rotationSpeed") {
             rotationSpeed = commandValue
@@ -109,10 +105,6 @@ basic.forever(function () {
             sendMode = commandValue
         } else if (commandName == "setMode") {
             mode = commandValue
-
-            if (mode == 2) {
-                rotationDurationMeasurement()
-            }
         }
     }
 })
@@ -183,47 +175,44 @@ basic.forever(function () {
         }
 
         basic.pause(distanceSemplingTime)
-    }
-})
+    } else if (mode == 2) {
+        let startTime: number = 0;
+        let endTime: number = 0;
 
+        wuKong.setMotorSpeed(wuKong.MotorList.M1, rotationSpeed)
+        wuKong.setServoSpeed(wuKong.ServoList.S0, rotationSpeed)
+        let trigger = false;
 
-function rotationDurationMeasurement() {
-    let startTime: number = 0;
-    let endTime: number = 0;
+        while (!startTime || !endTime) {
+            let distance = sonar.ping(DigitalPin.P0, DigitalPin.P1, PingUnit.Centimeters)
 
-    wuKong.setMotorSpeed(wuKong.MotorList.M1, rotationSpeed)
-    wuKong.setServoSpeed(wuKong.ServoList.S0, rotationSpeed)
-    let trigger = false;
-
-    while (!startTime || !endTime) {
-        let distance = sonar.ping(DigitalPin.P0, DigitalPin.P1, PingUnit.Centimeters)
-
-        if (distance > 0 && distance < 10) {
-            if (!trigger) {
-                if (!startTime) {
-                    startTime = input.runningTime()
-                } else {
-                    endTime = input.runningTime()
+            if (distance > 0 && distance < 10) {
+                if (!trigger) {
+                    if (!startTime) {
+                        startTime = input.runningTime()
+                    } else {
+                        endTime = input.runningTime()
+                    }
                 }
+
+                trigger = true
+            } else {
+                trigger = false
             }
 
-            trigger = true
-        } else {
-            trigger = false
+            if (mode != 2) {
+                send('break')
+                break
+            }
+            // send('current_mode : ' + mode)
+            basic.pause(20)
         }
 
-        if (mode != 2) {
-            send('break')
-            break 
-        }
-        // send('current_mode : ' + mode)
-        basic.pause(20)
+        wuKong.setMotorSpeed(wuKong.MotorList.M1, 0)
+        wuKong.setServoSpeed(wuKong.ServoList.S0, 0)
+
+        rotationDuration = endTime - startTime
+
+        send('rotation;' + rotationDuration)
     }
-
-    wuKong.setMotorSpeed(wuKong.MotorList.M1, 0)
-    wuKong.setServoSpeed(wuKong.ServoList.S0, 0)
-
-    rotationDuration = endTime - startTime
-
-    send('rotation;' + rotationDuration)
-}
+})
