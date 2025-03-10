@@ -10,11 +10,11 @@ const modeToButton: { [key: number]: number } = {
 
 let minDistance = 10;
 let maxDistance = 50;
-let rotationSpeed = -10;
+let rotationSpeed = -15;
 let rotationDuration = 0;
 let signalFrequency = 0;
 let sonarStartTime = 0;
-let distanceSemplingTime = 100;
+let distanceSemplingTime = 500;
 let sendQueue: string[] = []
 let sendMode = 0;
 let lastSignalTime = 0;
@@ -143,12 +143,13 @@ basic.forever(function () {
         } else if (commandName == "stop") {
             switchMode()
             stop()
+        } else if (commandName == "distanceSemplingTime") {
+            distanceSemplingTime = commandValue
         }
     }
 })
 
 // Queue
-
 basic.forever(function () {
     while(sendQueue.length) {
         bluetooth.uartWriteLine(sendQueue.shift())
@@ -168,16 +169,20 @@ basic.forever(function () {
 basic.forever(function () {
     if (mode == 0) {
         // Car beep
-        let distance = sonar.ping(DigitalPin.P0, DigitalPin.P1, PingUnit.Centimeters)
-        
-        if (distance > 0 && distance < maxDistance) {
-            signalFrequency = 25 * distance - 300
-            send([input.runningTime(), distance].join(','))
-        } else {
-            signalFrequency = 0
-        }
 
-        basic.pause(distanceSemplingTime)
+        while(mode == 0) {
+            let distance = sonar.ping(DigitalPin.P0, DigitalPin.P1, PingUnit.Centimeters)
+
+            if (distance > 0 && distance < maxDistance) {
+                signalFrequency = 25 * distance - 300
+                send([input.runningTime(), distance].join(','))
+            } else {
+                signalFrequency = 0
+                send([input.runningTime(), 0].join(','))
+            }
+
+            basic.pause(distanceSemplingTime)
+        }
     } else if (mode == 1 && rotationDuration) {
         // Sonar
         let distance = sonar.ping(DigitalPin.P0, DigitalPin.P1, PingUnit.Centimeters)
