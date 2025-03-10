@@ -24,6 +24,10 @@ let sweepAngle = 10
 let lastDataAngle = 0;
 let lastSweepAngle = 0;
 
+let volumeMode = false;
+let volume = 50;
+let noteFrequency = 261;
+
 music.setVolume(50)
 basic.clearScreen()
 bluetooth.startUartService()
@@ -74,13 +78,11 @@ function startSonar() {
         if (!sonarStartTime) {
             sonarStartTime = input.runningTime()
         }
-        wuKong.setMotorSpeed(wuKong.MotorList.M1, rotationSpeed)
         wuKong.setServoSpeed(wuKong.ServoList.S0, rotationSpeed)
     }
 }
 
 function stop() {
-    wuKong.setMotorSpeed(wuKong.MotorList.M1, 0)
     wuKong.setServoSpeed(wuKong.ServoList.S0, 0)
 }
 
@@ -92,26 +94,29 @@ basic.forever(function () {
         delete latestCommands[commandName];
 
         if (commandName == "-v") {
-            wuKong.setMotorSpeed(wuKong.MotorList.M1, 0)
             wuKong.setServoSpeed(wuKong.ServoList.S0, 0)
 
-            bluetooth.uartWriteLine('vc;import_start;')
+            // bluetooth.uartWriteLine('vc;import_start;')
             bluetooth.uartWriteLine('vc;init;')
-            bluetooth.uartWriteLine('vc;sl;0;0;360;1;0;0;0;;')
+            bluetooth.uartWriteLine('vc;sl;0;130;987;1;0;0;0;261;')
             bluetooth.uartWriteLine('vc;sr;1;-100;100;1;0;0;0;;')
             bluetooth.uartWriteLine('vc;b;1;1;0;<i class="fa-solid fa-car-side"></i>;')
-            bluetooth.uartWriteLine('vc;b;2;1;0;<i class="fa-solid fa-satellite-dish"></i>;')
+            bluetooth.uartWriteLine('vc;b;2;1;1;<i class="fa-solid fa-satellite-dish"></i>;')
             bluetooth.uartWriteLine('vc;b;5;1;0;<i class="fa-solid fa-clock-rotate-left"></i>;')
+            bluetooth.uartWriteLine('vc;b;3;1;0;<i class="fa-solid fa-volume-high"></i>;')
+            bluetooth.uartWriteLine('vc;b;4;1;0;<i class="fa-solid fa-play"></i>;')
             bluetooth.uartWriteLine('vc;il;1;')
             bluetooth.uartWriteLine('vc;ir;1;')
-            bluetooth.uartWriteLine('vc;show;sl,sr,br;')
-            bluetooth.uartWriteLine('vc;import_end;')
-        } else if (commandName == "oy" || commandName == "sl" || commandName == "jry") {
-            if (commandValue >= 0 && commandValue <= 360) {
-                wuKong.setServoAngle(wuKong.ServoTypeList._360, wuKong.ServoList.S0, commandValue)
+            bluetooth.uartWriteLine('vc;show;sl,sr,br,bl;')
+            // bluetooth.uartWriteLine('vc;import_end;')
+        } else if (commandName == "sl") {
+            if (volumeMode) {
+                volume = commandValue
+                music.setVolume(commandValue)
+            } else {
+                noteFrequency = commandValue
             }
-        } else if (commandName == "ox" || commandName == "sr" || commandName == "jrx") {
-            wuKong.setMotorSpeed(wuKong.MotorList.M1, commandValue)
+        } else if (commandName == "sr") {
             wuKong.setServoSpeed(wuKong.ServoList.S0, commandValue)
         } else if (commandName == "1") {
                 switchMode(0)
@@ -139,12 +144,27 @@ basic.forever(function () {
         } else if (commandName == "sweepAngle") {
             sweepAngle = commandValue
         } else if (commandName == "musicVolume") {
+            volume = commandValue
             music.setVolume(commandValue)
         } else if (commandName == "stop") {
             switchMode()
             stop()
         } else if (commandName == "distanceSemplingTime") {
             distanceSemplingTime = commandValue
+        } else if (commandName == "3") {
+            volumeMode = !volumeMode
+
+            if (volumeMode) {
+                bluetooth.uartWriteLine('vc;b;3;1;1;')
+                bluetooth.uartWriteLine(`vc;sl;0;0;255;1;0;0;0;${volume};`)
+                // bluetooth.uartWriteLine(`vc;slv;${volume};`)
+            } else {
+                bluetooth.uartWriteLine('vc;b;3;1;0;')
+                bluetooth.uartWriteLine(`vc;sl;0;130;987;1;0;0;0;${noteFrequency};`)
+                // bluetooth.uartWriteLine(`vc;slv;${noteFrequency};`)
+            }
+        } else if (commandName == "4") {
+            music.playTone(noteFrequency, 1000)
         }
     }
 })
@@ -211,35 +231,31 @@ basic.forever(function () {
         let startTime: number = 0;
         let endTime: number = 0;
 
-        wuKong.setMotorSpeed(wuKong.MotorList.M1, rotationSpeed)
         wuKong.setServoSpeed(wuKong.ServoList.S0, rotationSpeed)
-        let trigger = false;
+        let trigger = true;
 
-        while (!startTime || !endTime) {
+        while (mode == 2 && (!startTime || !endTime)) {
             let distance = sonar.ping(DigitalPin.P0, DigitalPin.P1, PingUnit.Centimeters)
 
-            if (distance > 0 && distance < 10) {
-                if (!trigger) {
-                    if (!startTime) {
-                        startTime = input.runningTime()
-                    } else {
-                        endTime = input.runningTime()
+            if (distance > 0 && distance < 1000) {
+                if (distance > 0 && distance < 10) {
+                    if (!trigger) {
+                        if (!startTime) {
+                            startTime = input.runningTime()
+                        } else {
+                            endTime = input.runningTime()
+                        }
+
+                        trigger = true
                     }
+                } else {
+                    trigger = false
                 }
-
-                trigger = true
-            } else {
-                trigger = false
-            }
-
-            if (mode != 2) {
-                break
             }
 
             basic.pause(20)
         }
 
-        wuKong.setMotorSpeed(wuKong.MotorList.M1, 0)
         wuKong.setServoSpeed(wuKong.ServoList.S0, 0)
 
         rotationDuration = endTime - startTime
