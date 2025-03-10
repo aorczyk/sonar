@@ -84,6 +84,7 @@ function startSonar() {
 
 function stop() {
     wuKong.setServoSpeed(wuKong.ServoList.S0, 0)
+    switchMode()
 }
 
 
@@ -101,7 +102,7 @@ basic.forever(function () {
             bluetooth.uartWriteLine('vc;sl;0;130;987;1;0;0;0;261;')
             bluetooth.uartWriteLine('vc;sr;1;-100;100;1;0;0;0;;')
             bluetooth.uartWriteLine('vc;b;1;1;0;<i class="fa-solid fa-car-side"></i>;')
-            bluetooth.uartWriteLine('vc;b;2;1;1;<i class="fa-solid fa-satellite-dish"></i>;')
+            bluetooth.uartWriteLine('vc;b;2;1;0;<i class="fa-solid fa-satellite-dish"></i>;')
             bluetooth.uartWriteLine('vc;b;5;1;0;<i class="fa-solid fa-clock-rotate-left"></i>;')
             bluetooth.uartWriteLine('vc;b;3;1;0;<i class="fa-solid fa-volume-high"></i>;')
             bluetooth.uartWriteLine('vc;b;4;1;0;<i class="fa-solid fa-play"></i>;')
@@ -123,14 +124,16 @@ basic.forever(function () {
         } else if (commandName == "2") {
                 if (mode != 1) {
                     if (rotationDuration) {
+                        bluetooth.uartWriteLine('vc;m;')
+                        switchMode(1)
                         startSonar()
                     } else {
                         send('alert;Rotation time is not set!')
+                        bluetooth.uartWriteLine('vc;m;Not set!')
                     }
                 } else {
                     stop()
                 }
-                switchMode(1)
         } else if (commandName == "5") {
                 switchMode(2)
         } else if (commandName == "rotationSpeed") {
@@ -165,6 +168,8 @@ basic.forever(function () {
             }
         } else if (commandName == "4") {
             music.playTone(noteFrequency, 1000)
+        } else if (commandName == "rotationDuration") {
+            rotationDuration = commandValue
         }
     }
 })
@@ -261,6 +266,7 @@ basic.forever(function () {
         rotationDuration = endTime - startTime
 
         send('rotation;' + rotationDuration)
-        switchMode(null)
+        bluetooth.uartWriteLine('vc;m;' + rotationDuration)
+        switchMode()
     }
 })
