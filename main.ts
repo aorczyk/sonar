@@ -13,14 +13,14 @@ let maxDistance = 50;
 let rotationSpeed = -15;
 let rotationDuration = 0;
 let signalFrequency = 0;
-let sonarStartTime = 0;
+let sonarStopRotationTime = 0;
 let distanceSemplingTime = 500;
 let sendQueue: string[] = []
-let sendMode = 0;
+let sendMode = 1;
 let lastSignalTime = 0;
 
-let dataAngle = 1
-let sweepAngle = 10
+let dataAngle = 3
+let sweepAngle = 3
 let lastDataAngle = 0;
 let lastSweepAngle = 0;
 
@@ -58,27 +58,16 @@ function send(message: string) {
 
 function switchMode(newMode: number = null) {
     if (modeToButton[mode]) {
-        bluetooth.uartWriteLine('vc;b;' + modeToButton[mode] + ';1;0;')
+        send('vc;b;' + modeToButton[mode] + ';1;0;')
     }
 
     if (mode !== newMode) {
         mode = newMode
         if (modeToButton[newMode]) {
-            bluetooth.uartWriteLine('vc;b;' + modeToButton[newMode] + ';1;1;')
+            send('vc;b;' + modeToButton[newMode] + ';1;1;')
         }
     } else {
         mode = null
-    }
-}
-
-function startSonar() {
-    if (rotationDuration) {
-        send('clearData')
-
-        if (!sonarStartTime) {
-            sonarStartTime = input.runningTime()
-        }
-        wuKong.setServoSpeed(wuKong.ServoList.S0, rotationSpeed)
     }
 }
 
@@ -97,19 +86,19 @@ basic.forever(function () {
         if (commandName == "-v") {
             wuKong.setServoSpeed(wuKong.ServoList.S0, 0)
 
-            // bluetooth.uartWriteLine('vc;import_start;')
-            bluetooth.uartWriteLine('vc;init;')
-            bluetooth.uartWriteLine('vc;sl;0;130;987;1;0;0;0;261;')
-            bluetooth.uartWriteLine('vc;sr;1;-100;100;1;0;0;0;;')
-            bluetooth.uartWriteLine('vc;b;1;1;0;<i class="fa-solid fa-car-side"></i>;')
-            bluetooth.uartWriteLine('vc;b;2;1;0;<i class="fa-solid fa-satellite-dish"></i>;')
-            bluetooth.uartWriteLine('vc;b;5;1;0;<i class="fa-solid fa-clock-rotate-left"></i>;')
-            bluetooth.uartWriteLine('vc;b;3;1;0;<i class="fa-solid fa-volume-high"></i>;')
-            bluetooth.uartWriteLine('vc;b;4;1;0;<i class="fa-solid fa-play"></i>;')
-            bluetooth.uartWriteLine('vc;il;1;')
-            bluetooth.uartWriteLine('vc;ir;1;')
-            bluetooth.uartWriteLine('vc;show;sl,sr,br,bl;')
-            // bluetooth.uartWriteLine('vc;import_end;')
+            // send('vc;import_start;')
+            send('vc;init;')
+            send('vc;sl;0;130;987;1;0;0;0;261;')
+            send('vc;sr;1;-100;100;1;0;0;0;;')
+            send('vc;b;1;1;0;<i class="fa-solid fa-car-side"></i>;')
+            send('vc;b;2;1;0;<i class="fa-solid fa-satellite-dish"></i>;')
+            send('vc;b;5;1;0;<i class="fa-solid fa-clock-rotate-left"></i>;')
+            send('vc;b;3;1;0;<i class="fa-solid fa-volume-high"></i>;')
+            send('vc;b;4;1;0;<i class="fa-solid fa-play"></i>;')
+            send('vc;il;1;')
+            send('vc;ir;1;')
+            send('vc;show;sl,sr,br,bl;')
+            // send('vc;import_end;')
         } else if (commandName == "sl") {
             if (volumeMode) {
                 volume = commandValue
@@ -124,12 +113,12 @@ basic.forever(function () {
         } else if (commandName == "2") {
                 if (mode != 1) {
                     if (rotationDuration) {
-                        bluetooth.uartWriteLine('vc;m;')
+                        send('vc;m;')
+                        send('clearData')
                         switchMode(1)
-                        startSonar()
                     } else {
                         send('alert;Rotation time is not set!')
-                        bluetooth.uartWriteLine('vc;m;Not set!')
+                        send('vc;m;Not set!')
                     }
                 } else {
                     stop()
@@ -152,23 +141,23 @@ basic.forever(function () {
         } else if (commandName == "stop") {
             switchMode()
             stop()
-        } else if (commandName == "distanceSemplingTime") {
+        } else if (commandName == "dstime") {
             distanceSemplingTime = commandValue
         } else if (commandName == "3") {
             volumeMode = !volumeMode
 
             if (volumeMode) {
-                bluetooth.uartWriteLine('vc;b;3;1;1;')
-                bluetooth.uartWriteLine(`vc;sl;0;0;255;1;0;0;0;${volume};`)
-                // bluetooth.uartWriteLine(`vc;slv;${volume};`)
+                send('vc;b;3;1;1;')
+                send(`vc;sl;0;0;255;1;0;0;0;${volume};`)
+                // send(`vc;slv;${volume};`)
             } else {
-                bluetooth.uartWriteLine('vc;b;3;1;0;')
-                bluetooth.uartWriteLine(`vc;sl;0;130;987;1;0;0;0;${noteFrequency};`)
-                // bluetooth.uartWriteLine(`vc;slv;${noteFrequency};`)
+                send('vc;b;3;1;0;')
+                send(`vc;sl;0;130;987;1;0;0;0;${noteFrequency};`)
+                // send(`vc;slv;${noteFrequency};`)
             }
         } else if (commandName == "4") {
             music.playTone(noteFrequency, 1000)
-        } else if (commandName == "rotationDuration") {
+        } else if (commandName == "rt") {
             rotationDuration = commandValue
         }
     }
@@ -210,28 +199,39 @@ basic.forever(function () {
         }
     } else if (mode == 1 && rotationDuration) {
         // Sonar
-        let distance = sonar.ping(DigitalPin.P0, DigitalPin.P1, PingUnit.Centimeters)
-        let angle = ((input.runningTime() - sonarStartTime) % rotationDuration) * 360 / rotationDuration
+        let rotationTime = 0;
+        
+        wuKong.setServoSpeed(wuKong.ServoList.S0, rotationSpeed)
 
-        let angleCounter = angle - lastDataAngle;
-        if (angleCounter < 0) {
-            angleCounter = 360 + angleCounter;
+        let sonarStartTime = input.runningTime()
+
+        while (mode == 1) {
+            let distance = sonar.ping(DigitalPin.P0, DigitalPin.P1, PingUnit.Centimeters)
+            rotationTime = input.runningTime() - sonarStartTime
+            let angle = ((rotationTime + sonarStopRotationTime) % rotationDuration) * 360 / rotationDuration
+
+            let angleCounter = angle - lastDataAngle;
+            if (angleCounter < 0) {
+                angleCounter = 360 + angleCounter;
+            }
+
+            let angleSweepCounter = angle - lastSweepAngle;
+            if (angleSweepCounter < 0) {
+                angleSweepCounter = 360 + angleSweepCounter;
+            }
+
+            if (distance > 0 && distance < maxDistance && angleCounter >= dataAngle) {
+                send([input.runningTime(), distance, angle].join(','))
+                lastDataAngle = angle
+            } else if (angleSweepCounter >= sweepAngle) {
+                send([input.runningTime(), 0, angle].join(','))
+                lastSweepAngle = angle
+            }
+
+            basic.pause(20)
         }
 
-        let angleSweepCounter = angle - lastSweepAngle;
-        if (angleSweepCounter < 0) {
-            angleSweepCounter = 360 + angleSweepCounter;
-        }
-
-        if (distance > 0 && distance < maxDistance && angleCounter >= dataAngle) {
-            send([input.runningTime(), distance, angle].join(','))
-            lastDataAngle = angle
-        } else if (angleSweepCounter >= sweepAngle) {
-            send([input.runningTime(), 0, angle].join(','))
-            lastSweepAngle = angle
-        }
-
-        // basic.pause(distanceSemplingTime)
+        sonarStopRotationTime = rotationTime + sonarStopRotationTime
     } else if (mode == 2) {
         let startTime: number = 0;
         let endTime: number = 0;
@@ -266,7 +266,7 @@ basic.forever(function () {
         rotationDuration = endTime - startTime
 
         send('rotation;' + rotationDuration)
-        bluetooth.uartWriteLine('vc;m;' + rotationDuration)
+        send('vc;m;' + rotationDuration)
         switchMode()
     }
 })
